@@ -1,49 +1,110 @@
-# inventory-demand-forecasting
-Retailers face significant losses due to inaccurate  demand estimates, causing stockouts or  overstock situations. Traditional forecasting  models struggle with dynamic market  conditions .
+# 📦 Inventory Demand Forecasting
 
+Retailers face significant losses due to inaccurate demand estimation, leading to **stockouts** or **overstock situations**. Traditional forecasting approaches often fail to adapt to dynamic market conditions.
 
-# Project Structure
+Accurate demand forecasting helps retailers:
+
+* Avoid stockouts 📉
+* Reduce overstock 📦
+* Improve supply chain efficiency 🚚
+
+---
+
+## 📊 Dataset Description
+
+The dataset contains historical sales records with the following features:
+
+| Column | Description                                |
+| ------ | ------------------------------------------ |
+| Date   | Date of sale                               |
+| Store  | Store ID                                   |
+| Item   | Product/Item ID                            |
+| Sales  | Number of items sold (**target variable**) |
+
+---
+
+## 🧠 Problem Statement
+
+> Predict future sales for each store-item combination using historical data.
+
+This is a **time series forecasting problem** with multiple entities (Store × Item).
+
+---
+
+## 📁 Project Structure
+
+```bash
 Inventory-Demand-Forecasting/
 │
-├── artifacts/                        # Generated outputs
-│   ├── raw_data.csv
-│   ├── processed_data.csv 
-│   ├── model.pkl
-│   └── metrics.json
+├── data/
+│   └── train.csv                # Raw dataset
 │
-├── notebooks/                        # Experimentation
-│   ├── data/
-│   │    └── train.csv
-│   │
-│   ├── 1_EDA_Inventory_Demand.ipynb
+├── notebooks/                  # Experimentation
+│   ├── 1_EDA.ipynb
 │   ├── 2_Feature_Engineering.ipynb
 │   └── 3_Model_Training.ipynb
 │
-├── src/
+├── artifacts/                  # Outputs
+│   ├── processed_data.csv
+│   ├── model.pkl
+│   └── metrics.json
+│
+├── src/                        # Production code (future scope)
 │   ├── components/
-│   │
-│   │    ├── data_ingestion.py        # Load & split dataset
-│   │    ├── data_transformation.py   # Feature engineering (VERY IMPORTANT)
-│   │    ├── model_trainer.py         # Train ML models
-│   │    ├── model_evaluation.py      # Evaluate performance
-│   │
 │   ├── pipeline/
-│   │    ├── training_pipeline.py     # End-to-end training
-│   │    └── prediction_pipeline.py   # Future demand prediction
-│   │
-│   │
-│   ├── exception.py
 │   ├── logger.py
+│   ├── exception.py
 │   └── utils.py
 │
-├── app/                             
-│   ├── app.py                        # Streamlit / FastAPI app
-│   └── templates/
-│
-├── config/
-│   ├── config.yaml                   # Model parameters
-│   └── schema.yaml                   # Data schema
-│
 ├── requirements.txt
-├── setup.py
 └── README.md
+```
+
+---
+
+## 🔍 Current Work
+
+* Exploratory Data Analysis (EDA)
+* Understanding sales patterns
+* Feature engineering for time-based data
+
+---
+
+## 📈 Key Insights (from EDA)
+
+* Sales vary across stores and items
+* Strong time-based patterns (trend + seasonality)
+* Each Store–Item pair behaves differently
+* Weekly and monthly demand cycles exist
+
+---
+
+## ⚙️ Feature Engineering
+
+From `Date`, we extract:
+
+* Year
+* Month
+* Day
+* Day of Week
+* Week of Year
+
+Additional strategies:
+
+* Store-level demand patterns
+* Item-level behavior
+* Interaction features (Store × Item)
+
+---
+
+
+## 🛠️ Tech Stack
+
+* Python
+* Pandas, NumPy
+* Matplotlib, Seaborn
+* Scikit-learn
+
+---
+
+
