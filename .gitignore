@@ -3,6 +3,8 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# processed_inventory_demand.csv
+notebooks/data/processed_inventory_demand.csv
 # C extensions
 *.so
 
