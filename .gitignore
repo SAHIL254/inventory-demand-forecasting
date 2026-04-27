@@ -8,6 +8,9 @@ notebooks/data/processed_inventory_demand.csv
 # C extensions
 *.so
 
+artifacts/
+*.csv
+
 # Distribution / packaging
 .Python
 build/
