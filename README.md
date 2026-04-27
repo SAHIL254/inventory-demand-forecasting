@@ -34,29 +34,51 @@ This is a **time series forecasting problem** with multiple entities (Store × I
 ## 📁 Project Structure
 
 ```bash
-Inventory-Demand-Forecasting/
+inventory-demand-forecasting/
 │
-├── data/
-│   └── train.csv                # Raw dataset
-│
-├── notebooks/                  # Experimentation
-│   ├── 1_EDA.ipynb
-│   ├── 2_Feature_Engineering.ipynb
-│   └── 3_Model_Training.ipynb
-│
-├── artifacts/                  # Outputs
-│   ├── processed_data.csv
+├── artifacts/                         
+│   ├── raw_data.csv
+│   ├── processed_inventory_demand.csv   
+│   ├── train.csv
+│   ├── test.csv
 │   ├── model.pkl
-│   └── metrics.json
+│   ├── preprocessor.pkl
+│   └── predictions.csv
 │
-├── src/                        # Production code (future scope)
+├── notebooks/                        # Jupyter notebooks (experiments)
+│   ├── data/
+│   │   └── train.csv
+│   │
+│   ├── 1_EDA_Inventory.ipynb       
+│   ├── 2_Model_Training.ipynb        
+│   └── 3_Forecasting.ipynb           (future prediction)
+│
+├── src/                              
 │   ├── components/
+│   │   ├── data_ingestion.py
+│   │   ├── data_transformation.py
+│   │   ├── feature_engineering.py   
+│   │   ├── model_trainer.py         
+│   │   └── model_evaluation.py
+│   │
 │   ├── pipeline/
-│   ├── logger.py
+│   │   ├── training_pipeline.py
+│   │   └── prediction_pipeline.py
+│   │
 │   ├── exception.py
+│   ├── logger.py
 │   └── utils.py
 │
+├── app/                              
+│   ├── app.py                        # Flask / FastAPI backend
+│   ├── templates/
+│   └── static/
+│
+├── config/
+│   └── config.yaml                   # paths + hyperparameters
+│
 ├── requirements.txt
+├── setup.py
 └── README.md
 ```
 
