@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Training Results — Inventory Demand Forecasting{% endblock %}
+
+{% block content %}
+
+<div class="card">
+  <h2>Training Complete</h2>
+  <p>
+    Best model selected: <strong>{{ best_model }}</strong>
+    &nbsp;<span class="badge badge-green">Saved</span>
+  </p>
+</div>
+
+<div class="card">
+  <h2>Model Comparison</h2>
+  <p>All models evaluated on the 2017 hold-out test set (original sales scale). Sorted by SMAPE ↑ (lower is better).</p>
+  {{ results_table | safe }}
+</div>
+
+<div style="margin-top:1rem;">
+  <a href="{{ url_for('predict') }}" class="btn btn-primary">Make a Prediction →</a>
+  &nbsp;
+  <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
+</div>
+
+{% endblock %}

@@ -51,7 +51,6 @@ inventory-demand-forecasting/
 │   │
 │   ├── 1_EDA_Inventory.ipynb       
 │   ├── 2_Model_Training.ipynb        
-│   └── 3_Forecasting.ipynb           (future prediction)
 │
 ├── src/                              
 │   ├── components/
@@ -70,12 +69,12 @@ inventory-demand-forecasting/
 │   └── utils.py
 │
 ├── app/                              
-│   ├── app.py                        # Flask / FastAPI backend
+│   ├── app.py                        # Flask
 │   ├── templates/
 │   └── static/
 │
 ├── config/
-│   └── config.yaml                   # paths + hyperparameters
+│   └── config.yaml                   # paths
 │
 ├── requirements.txt
 ├── setup.py

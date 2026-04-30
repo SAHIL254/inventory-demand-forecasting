@@ -1,0 +1,50 @@
+# Inventory Demand Forecasting — Central Configuration
+
+
+paths:
+  source_data:    notebooks/data/train.csv
+  raw_data:       artifacts/raw_data.csv
+  train_data:     artifacts/train.csv
+  test_data:      artifacts/test.csv
+  processed_data: artifacts/processed_inventory_demand.csv
+  model:          artifacts/model.pkl
+  preprocessor:   artifacts/preprocessor.pkl
+  predictions:    artifacts/predictions.csv
+
+split:
+  date: "2017-01-01"
+
+features:
+  lag_days:        [1, 7, 14, 30, 90, 365]
+  rolling_windows: [7, 14, 30]
+  group_cols:      ["store", "item"]
+
+models:
+  random_forest:
+    n_estimators: 100
+    max_depth:    10
+    random_state: 42
+
+  xgboost:
+    n_estimators:          1000
+    learning_rate:         0.05
+    max_depth:             8
+    tree_method:           hist
+    early_stopping_rounds: 50
+    random_state:          42
+
+  lightgbm:
+    n_estimators:  1000
+    learning_rate: 0.03
+    max_depth:     8
+    num_leaves:    31
+    random_state:  42
+
+app:
+  host:      "0.0.0.0"
+  port:      5000
+  debug:     true
+  store_min: 1
+  store_max: 10
+  item_min:  1
+  item_max:  50

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Home — Inventory Demand Forecasting{% endblock %}
+
+{% block content %}
+
+<div class="hero">
+  <h1>📦 Inventory Demand Forecasting</h1>
+  <p>Predict future sales for each store–item combination using historical data, seasonality, and consumer trends.</p>
+</div>
+
+<!-- Model Status -->
+<div class="card">
+  <h2>Model Status</h2>
+  <p>
+    {% if model_exists %}
+      <span class="badge badge-green">✅ Trained model found</span>
+      — You can go ahead and make predictions.
+    {% else %}
+      <span class="badge badge-red">⚠️ No trained model</span>
+      — Train the model first before making predictions.
+    {% endif %}
+  </p>
+</div>
+
+<!-- Actions -->
+<div class="grid-2">
+
+  <div class="card">
+    <h2>🚀 Train Model</h2>
+    <p>
+      Runs the full ML pipeline: data ingestion → feature engineering →
+      trains Linear Regression, Random Forest, XGBoost, and LightGBM,
+      then saves the best model.
+    </p>
+    <form method="POST" action="{{ url_for('train') }}"
+          onsubmit="this.querySelector('button').disabled=true;
+                    this.querySelector('button').textContent='Training…';">
+      <button type="submit" class="btn btn-success">▶ Start Training</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Make a Prediction</h2>
+    <p>
+      Enter a store ID, item ID, and a future date to get the predicted
+      number of units sold for that day.
+    </p>
+    <a href="{{ url_for('predict') }}" class="btn btn-primary">Go to Predict →</a>
+  </div>
+
+</div>
+
+<!-- API Info -->
+<div class="card">
+  <h2>⚡ API Endpoints</h2>
+  <p>Send JSON requests for batch or multi-step forecasts.</p>
+  <pre style="background:#f7fafc;padding:1rem;border-radius:8px;font-size:.85rem;overflow-x:auto;">
+POST /predict/batch
+{"records": [{"store": 1, "item": 5, "date": "2018-01-01"}, ...]}
+
+POST /predict/multi
+{"store": 1, "item": 5, "days": 7}</pre>
+</div>
+
+{% endblock %}

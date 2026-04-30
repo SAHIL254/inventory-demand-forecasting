@@ -1,0 +1,84 @@
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f0f4f8;
+  color: #2d3748;
+  min-height: 100vh;
+}
+a { color: #2b6cb0; }
+a:hover { color: #2c5282; }
+small { font-weight: 400; color: #718096; font-size: .8rem; }
+pre { background: #f7fafc; padding: 1rem; border-radius: 8px; font-size: .85rem; overflow-x: auto; }
+
+/* ── Navbar ── */
+nav {
+  background: #1a365d;
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+nav .brand { color: #fff; font-size: 1.2rem; font-weight: 700; text-decoration: none; }
+nav .nav-links a { color: #bee3f8; text-decoration: none; margin-left: 1.5rem; font-size: .95rem; transition: color .2s; }
+nav .nav-links a:hover { color: #fff; }
+
+/* ── Container ── */
+.container { max-width: 900px; margin: 2.5rem auto; padding: 0 1rem; }
+
+/* ── Cards ── */
+.card { background: #fff; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.08); padding: 2rem 2.5rem; margin-bottom: 1.5rem; }
+.card h2 { font-size: 1.4rem; color: #1a365d; margin-bottom: .5rem; }
+.card p  { color: #718096; margin-bottom: 1.2rem; line-height: 1.6; }
+
+/* ── Buttons ── */
+.btn { display: inline-block; padding: .65rem 1.6rem; border-radius: 8px; font-size: .95rem; font-weight: 600; cursor: pointer; border: none; text-decoration: none; transition: background .2s, transform .1s; }
+.btn:active { transform: scale(.97); }
+.btn-primary   { background: #2b6cb0; color: #fff; }
+.btn-primary:hover { background: #2c5282; }
+.btn-success   { background: #276749; color: #fff; }
+.btn-success:hover { background: #22543d; }
+.btn-secondary { background: #e2e8f0; color: #2d3748; }
+.btn-secondary:hover { background: #cbd5e0; }
+
+/* ── Badge ── */
+.badge { display: inline-block; padding: .25rem .75rem; border-radius: 999px; font-size: .8rem; font-weight: 600; }
+.badge-green { background: #c6f6d5; color: #22543d; }
+.badge-red   { background: #fed7d7; color: #742a2a; }
+
+/* ── Flash messages ── */
+.flash-list { list-style: none; margin-bottom: 1rem; }
+.flash-list li { padding: .8rem 1.2rem; border-radius: 8px; margin-bottom: .5rem; font-size: .95rem; }
+.flash-success { background: #c6f6d5; color: #22543d; border-left: 4px solid #38a169; }
+.flash-warning { background: #fefcbf; color: #744210; border-left: 4px solid #d69e2e; }
+.flash-danger  { background: #fed7d7; color: #742a2a; border-left: 4px solid #e53e3e; }
+
+/* ── Form ── */
+.form-group { margin-bottom: 1.2rem; }
+.form-group label { display: block; font-weight: 600; margin-bottom: .4rem; color: #4a5568; font-size: .9rem; }
+.form-group input, .form-group select { width: 100%; padding: .6rem .9rem; border: 1.5px solid #cbd5e0; border-radius: 8px; font-size: .95rem; color: #2d3748; background: #f7fafc; transition: border-color .2s; }
+.form-group input:focus, .form-group select:focus { outline: none; border-color: #2b6cb0; background: #fff; }
+
+/* ── Results table ── */
+.results-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.results-table th { background: #2b6cb0; color: #fff; padding: .7rem 1rem; text-align: left; }
+.results-table td { padding: .65rem 1rem; border-bottom: 1px solid #e2e8f0; }
+.results-table tr:first-child td { background: #ebf8ff; font-weight: 700; }
+.results-table tr:hover td { background: #f7fafc; }
+
+/* ── Prediction result box ── */
+.prediction-box { background: #ebf8ff; border: 2px solid #2b6cb0; border-radius: 12px; padding: 1.5rem 2rem; text-align: center; margin-top: 1.5rem; }
+.prediction-box .label { color: #4a5568; font-size: .9rem; margin-bottom: .3rem; }
+.prediction-box .value { font-size: 2.8rem; font-weight: 800; color: #1a365d; }
+.prediction-box .unit  { color: #718096; font-size: .85rem; margin-top: .2rem; }
+
+/* ── Hero ── */
+.hero { text-align: center; padding: 2rem 0 1rem; }
+.hero h1 { font-size: 2rem; color: #1a365d; margin-bottom: .5rem; }
+.hero p  { color: #718096; font-size: 1rem; }
+
+/* ── Grid ── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+@media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
