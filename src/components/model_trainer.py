@@ -44,7 +44,7 @@ class ModelTrainer:
 
             # Linear Regression is sensitive to feature scale; tree-based models are not.
             # LR is wrapped in a sklearn Pipeline so prediction stays seamless.
-            # Not appled this scaler to RF, XGBoost, or LightGBM inputs.
+            # Do NOT apply this scaler to RF, XGBoost, or LightGBM inputs.
             scaler         = StandardScaler()
             X_train_scaled = scaler.fit_transform(X_train)
             X_test_scaled  = scaler.transform(X_test)
