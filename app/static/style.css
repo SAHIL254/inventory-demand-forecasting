@@ -52,8 +52,8 @@ nav .nav-links a:hover { color: #fff; }
 .flash-list { list-style: none; margin-bottom: 1rem; }
 .flash-list li { padding: .8rem 1.2rem; border-radius: 8px; margin-bottom: .5rem; font-size: .95rem; }
 .flash-success { background: #c6f6d5; color: #22543d; border-left: 4px solid #38a169; }
-.flash-warning { background: #fefcbf; color: #744210; border-left: 4px solid #d69e2e; }
 .flash-danger  { background: #fed7d7; color: #742a2a; border-left: 4px solid #e53e3e; }
+.flash-warning { background: #fefcbf; color: #744210; border-left: 4px solid #d69e2e; }
 
 /* ── Form ── */
 .form-group { margin-bottom: 1.2rem; }

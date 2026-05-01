@@ -32,7 +32,7 @@
       trains Linear Regression, Random Forest, XGBoost, and LightGBM,
       then saves the best model.
     </p>
-    <form method="POST" action="{{ url_for('train') }}"
+    <form method="POST" action="/train"
           onsubmit="this.querySelector('button').disabled=true;
                     this.querySelector('button').textContent='Training…';">
       <button type="submit" class="btn btn-success">▶ Start Training</button>
@@ -45,21 +45,9 @@
       Enter a store ID, item ID, and a future date to get the predicted
       number of units sold for that day.
     </p>
-    <a href="{{ url_for('predict') }}" class="btn btn-primary">Go to Predict →</a>
+    <a href="/predict" class="btn btn-primary">Go to Predict →</a>
   </div>
 
-</div>
-
-<!-- API Info -->
-<div class="card">
-  <h2>⚡ API Endpoints</h2>
-  <p>Send JSON requests for batch or multi-step forecasts.</p>
-  <pre style="background:#f7fafc;padding:1rem;border-radius:8px;font-size:.85rem;overflow-x:auto;">
-POST /predict/batch
-{"records": [{"store": 1, "item": 5, "date": "2018-01-01"}, ...]}
-
-POST /predict/multi
-{"store": 1, "item": 5, "days": 7}</pre>
 </div>
 
 {% endblock %}

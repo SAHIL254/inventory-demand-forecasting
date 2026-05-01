@@ -4,29 +4,25 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>{% block title %}Inventory Demand Forecasting{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}"/>
 </head>
 <body>
 
 <nav>
-  <a class="brand" href="{{ url_for('index') }}">Inventory Forecast</a>
+  <a class="brand" href="/">Inventory Forecast</a>
   <div class="nav-links">
-    <a href="{{ url_for('index') }}">Home</a>
-    <a href="{{ url_for('predict') }}">Predict</a>
+    <a href="/">Home</a>
+    <a href="/predict">Predict</a>
   </div>
 </nav>
 
 <div class="container">
 
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      <ul class="flash-list">
-        {% for category, message in messages %}
-          <li class="flash-{{ category }}">{{ message | safe }}</li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-  {% endwith %}
+  {% if flash_msg %}
+    <ul class="flash-list">
+      <li class="flash-{{ flash_cat }}">{{ flash_msg | safe }}</li>
+    </ul>
+  {% endif %}
 
   {% block content %}{% endblock %}
 
