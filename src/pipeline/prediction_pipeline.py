@@ -162,12 +162,19 @@ class PredictionPipeline:
         future_df = future_df.copy()
         future_df["sales"]     = 0
         future_df["sales_log"] = 0.0
+        future_df["_is_future"] = True          # marker to identify prediction rows
 
         # Compute sales_log from real history only (skip if already present)
         history_df = history_df.copy()
         history_df["date"] = pd.to_datetime(history_df["date"])
         if "sales_log" not in history_df.columns:
             history_df["sales_log"] = np.log1p(history_df["sales"])
+        history_df["_is_future"] = False
+
+        # Keep only the store-item pairs that appear in future_df so that
+        # lag/rolling features are computed per-pair only.
+        pairs = future_df[["store", "item"]].drop_duplicates()
+        history_df = history_df.merge(pairs, on=["store", "item"], how="inner")
 
         combined = pd.concat([history_df, future_df], ignore_index=True)
         combined["date"] = pd.to_datetime(combined["date"])
@@ -179,11 +186,15 @@ class PredictionPipeline:
         combined = fe._add_rolling_features(combined)
 
         feature_cols = fe._get_feature_cols(combined)
-        split_date   = pd.to_datetime(future_df["date"]).min()
-        pred_rows    = combined[combined["date"] >= split_date][feature_cols]
+
+        # Use the _is_future flag — not split_date — to select exactly the
+        # rows that need a prediction. This is safe even when history rows
+        # share the same date as a future row.
+        pred_rows = combined[combined["_is_future"] == True][feature_cols]
 
         preds = self.predict(pred_rows)
 
-        future_df = future_df.drop(columns=["sales", "sales_log"])
+        future_df = future_df.drop(columns=["sales", "sales_log", "_is_future"])
+        future_df = future_df.reset_index(drop=True)
         future_df["predicted_sales"] = preds
         return future_df[["date", "store", "item", "predicted_sales"]]

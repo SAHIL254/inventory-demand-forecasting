@@ -36,23 +36,21 @@ class DataTransformation:
                     raise ValueError(f"[{name}] Missing columns: {missing}")
             logger.info("Column validation passed")
 
-            # Handle missing values 
-            for df in (train, test):
-                n_missing = df.isnull().sum().sum()
+            # Handle missing values
+            for split_name, split_df in [("train", train), ("test", test)]:
+                n_missing = split_df.isnull().sum().sum()
                 if n_missing > 0:
-                    logger.warning(f"Found {n_missing} missing values — applying ffill + bfill")
-                    df.sort_values(["store", "item", "date"], inplace=True)
-                    df["sales"] = (
-                        df.groupby(["store", "item"])["sales"]
+                    logger.warning(f"[{split_name}] Found {n_missing} missing values — applying ffill + bfill")
+                    split_df.sort_values(["store", "item", "date"], inplace=True)
+                    split_df["sales"] = (
+                        split_df.groupby(["store", "item"])["sales"]
                         .transform(lambda x: x.ffill().bfill())
                     )
 
-            # Clip negative sales 
-            for name, df in [("train", train), ("test", test)]:
-                neg = (df["sales"] < 0).sum()
-                if neg > 0:
-                    logger.warning(f"[{name}] {neg} negative sales — clipping to 0")
-                    df["sales"] = df["sales"].clip(lower=0)
+            # Clip negative sales
+            train["sales"] = train["sales"].clip(lower=0)
+            test["sales"]  = test["sales"].clip(lower=0)
+            logger.info("Negative sales clipped to 0")
 
             #Log-transform target 
             # log1p(x) = log(1 + x) — safe for zero sales

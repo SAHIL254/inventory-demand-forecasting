@@ -57,7 +57,9 @@ def load_object(file_path: str) -> Any:
 def save_predictions(df: pd.DataFrame, path: str) -> None:
     """Save a predictions DataFrame to CSV."""
     try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        dir_name = os.path.dirname(path)
+        if dir_name:                        # only makedirs if there's a directory part
+            os.makedirs(dir_name, exist_ok=True)
         df.to_csv(path, index=False)
         logger.info(f"Predictions saved at: {path}")
     except Exception as e:

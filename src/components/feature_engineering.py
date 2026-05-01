@@ -126,5 +126,5 @@ class FeatureEngineering:
 
     def _get_feature_cols(self, df: pd.DataFrame) -> List[str]:
         """Return all columns to be used as model input features."""
-        drop = {"date", "sales", "sales_log"}
+        drop = {"date", "sales", "sales_log", "_is_future"}
         return [c for c in df.columns if c not in drop]
