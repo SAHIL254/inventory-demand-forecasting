@@ -4,6 +4,11 @@ An end-to-end machine learning pipeline that predicts daily sales for every **st
 
 ---
 
+🌐 Live Demo: https://inventory-demand-forecasting-dhof.onrender.com  
+⚠️ First load may take ~50 seconds (Render free tier)
+
+---
+
 ## 🧠 Problem Statement
 
 Retailers face significant losses due to inaccurate demand estimation, leading to **stockouts** (lost revenue) or **overstock situations** (wasted capital). Traditional forecasting models struggle to adapt to dynamic market conditions.
@@ -200,10 +205,10 @@ Expected runtime: **5–10 minutes** depending on hardware.
 ### 4. Start the web app
 
 ```bash
-uvicorn app.app:app --host 0.0.0.0 --port 5000 --reload
+uvicorn app.app:app --host 0.0.0.0 --port 10000 --reload
 ```
 
-Open **http://localhost:5000** in your browser.
+Open **http://localhost:10000** in your browser.
 
 ---
 
