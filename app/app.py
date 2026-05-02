@@ -50,14 +50,6 @@ STORE_MAX  = cfg["app"]["store_max"]
 ITEM_MIN   = cfg["app"]["item_min"]
 ITEM_MAX   = cfg["app"]["item_max"]
 
-# Pre-load history data once at startup to avoid repeated disk reads
-try:
-    _HISTORY_DF = pd.read_csv(RAW_DATA, parse_dates=["date"])
-    logger.info(f"History data pre-loaded: {_HISTORY_DF.shape}")
-except Exception:
-    _HISTORY_DF = None
-    logger.warning("Could not pre-load history data at startup")
-
 
 # ── Pydantic models for JSON API ──────────────────────────────
 
@@ -93,7 +85,7 @@ def _validate_store_item(store: int, item: int) -> Optional[str]:
 
 
 def _load_history(store: int, item: int) -> pd.DataFrame:
-    df = _HISTORY_DF if _HISTORY_DF is not None else pd.read_csv(RAW_DATA, parse_dates=["date"])
+    df = pd.read_csv(RAW_DATA, parse_dates=["date"])
     return df[(df["store"] == store) & (df["item"] == item)].copy()
 
 
@@ -259,7 +251,7 @@ async def predict_batch(body: BatchRequest):
         records_dicts = [r.model_dump() for r in body.records]
         future_df         = pd.DataFrame(records_dicts)
         future_df["date"] = pd.to_datetime(future_df["date"])
-        history           = _HISTORY_DF if _HISTORY_DF is not None else pd.read_csv(RAW_DATA, parse_dates=["date"])
+        history           = pd.read_csv(RAW_DATA, parse_dates=["date"])
 
         pipeline  = PredictionPipeline(model_path=MODEL_PATH)
         result_df = pipeline.predict_from_raw(history, future_df)
