@@ -42,8 +42,8 @@ models:
 
 app:
   host:      "0.0.0.0"
-  port:      5000
-  debug:     true
+  port:      10000
+  debug:     false
   store_min: 1
   store_max: 10
   item_min:  1
