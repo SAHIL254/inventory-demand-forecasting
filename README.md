@@ -298,9 +298,9 @@ Recursive multi-step forecast for a single store-item pair (up to 90 days).
    ```
 4. Set the start command:
    ```
-   uvicorn app.app:app --host 0.0.0.0 --port 5000
+   uvicorn app.app:app --host 0.0.0.0 --port 10000
    ```
-5. Set environment variable `PORT=5000` if required by Render.
+5. Set environment variable `PORT=10000` if required by Render.
 6. Deploy — the app will be live at your Render URL.
 
 > Change `port` in `config/config.yaml` to match the Render port if needed.
