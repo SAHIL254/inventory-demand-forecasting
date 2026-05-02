@@ -98,10 +98,13 @@ def _load_history(store: int, item: int) -> pd.DataFrame:
 
 
 def _render(request: Request, template: str, **ctx):
-    """Shorthand for templates.TemplateResponse."""
     ctx.setdefault("flash_msg", None)
     ctx.setdefault("flash_cat", None)
-    return templates.TemplateResponse(template, {"request": request, **ctx})
+    return templates.TemplateResponse(
+        request=request,        # ← pass as keyword argument
+        name=template,          # ← pass as keyword argument  
+        context=ctx             # ← context does NOT include request anymore
+    )
 
 
 # ── Routes ────────────────────────────────────────────────────
