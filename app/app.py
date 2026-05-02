@@ -5,7 +5,6 @@ FastAPI web application for Inventory Demand Forecasting.
 
 Routes:
   GET  /              — Home page (model status)
-  POST /train         — Trigger full training pipeline
   GET  /predict       — Single-prediction form
   POST /predict       — Run single-step prediction
   POST /predict/batch — JSON API for batch predictions
@@ -24,7 +23,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from src.pipeline.training_pipeline import TrainingPipeline
 from src.pipeline.prediction_pipeline import PredictionPipeline
 from src.utils import load_config
 from src.logger import logger
@@ -104,38 +102,6 @@ def _render(request: Request, template: str, **ctx):
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return _render(request, "index.html", model_exists=_model_exists())
-
-
-@app.post("/train", response_class=HTMLResponse)
-async def train(request: Request):
-    """Trigger the full training pipeline from the web UI."""
-    try:
-        logger.info("Training triggered from web UI")
-        pipeline = TrainingPipeline()
-        best_name, results = pipeline.run(source_path=RAW_DATA)
-
-        results_html = results.to_html(
-            index=False,
-            classes="results-table",
-            border=0,
-            float_format=lambda x: f"{x:.4f}",
-        )
-        return _render(
-            request, "result.html",
-            best_model=best_name,
-            results_table=results_html,
-            flash_msg=f"Training complete! Best model: <strong>{best_name}</strong>",
-            flash_cat="success",
-        )
-
-    except Exception as e:
-        logger.error(f"Training failed: {e}")
-        return _render(
-            request, "index.html",
-            model_exists=_model_exists(),
-            flash_msg=f"Training failed: {str(e)}",
-            flash_cat="danger",
-        )
 
 
 @app.get("/predict", response_class=HTMLResponse)

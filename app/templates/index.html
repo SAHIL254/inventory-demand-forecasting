@@ -23,21 +23,7 @@
 </div>
 
 <!-- Actions -->
-<div class="grid-2">
-
-  <div class="card">
-    <h2>🚀 Train Model</h2>
-    <p>
-      Runs the full ML pipeline: data ingestion → feature engineering →
-      trains Linear Regression, Random Forest, XGBoost, and LightGBM,
-      then saves the best model.
-    </p>
-    <form method="POST" action="/train"
-          onsubmit="this.querySelector('button').disabled=true;
-                    this.querySelector('button').textContent='Training…';">
-      <button type="submit" class="btn btn-success">▶ Start Training</button>
-    </form>
-  </div>
+<div>
 
   <div class="card">
     <h2>Make a Prediction</h2>
