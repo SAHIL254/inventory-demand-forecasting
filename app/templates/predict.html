@@ -3,6 +3,11 @@
 
 {% block content %}
 
+<div class="hero">
+  <h1>📦 Inventory Demand Forecasting</h1>
+  <p>Predict future sales for each store–item combination using historical data, seasonality, and consumer trends.</p>
+</div>
+
 <div class="card">
   <h2>Predict Daily Sales</h2>
   <p>Enter a store, item, and date to forecast how many units will be sold.</p>
@@ -36,8 +41,6 @@
     </div>
 
     <button type="submit" class="btn btn-primary" id="predict-btn">Get Prediction</button>
-    &nbsp;
-    <a href="/" class="btn btn-secondary">← Back</a>
 
     <span id="loading-msg" style="display:none; margin-left:1rem; color:#2b6cb0; font-weight:600;">
       ⏳ Predicting…

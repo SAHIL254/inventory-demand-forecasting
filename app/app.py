@@ -101,7 +101,7 @@ def _render(request: Request, template: str, **ctx):
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return _render(request, "index.html", model_exists=_model_exists())
+    return RedirectResponse(url="/predict", status_code=303)
 
 
 @app.get("/predict", response_class=HTMLResponse)
