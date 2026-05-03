@@ -38,15 +38,12 @@ nav .nav-links a:hover { color: #fff; }
 .btn:active { transform: scale(.97); }
 .btn-primary   { background: #2b6cb0; color: #fff; }
 .btn-primary:hover { background: #2c5282; }
-.btn-success   { background: #276749; color: #fff; }
-.btn-success:hover { background: #22543d; }
 .btn-secondary { background: #e2e8f0; color: #2d3748; }
 .btn-secondary:hover { background: #cbd5e0; }
 
 /* ── Badge ── */
 .badge { display: inline-block; padding: .25rem .75rem; border-radius: 999px; font-size: .8rem; font-weight: 600; }
 .badge-green { background: #c6f6d5; color: #22543d; }
-.badge-red   { background: #fed7d7; color: #742a2a; }
 
 /* ── Flash messages ── */
 .flash-list { list-style: none; margin-bottom: 1rem; }
