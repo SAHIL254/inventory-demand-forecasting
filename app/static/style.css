@@ -10,6 +10,7 @@ a { color: #2b6cb0; }
 a:hover { color: #2c5282; }
 small { font-weight: 400; color: #718096; font-size: .8rem; }
 pre { background: #f7fafc; padding: 1rem; border-radius: 8px; font-size: .85rem; overflow-x: auto; }
+code { background: #edf2f7; padding: .1rem .4rem; border-radius: 4px; font-size: .85rem; color: #2d3748; }
 
 /* ── Navbar ── */
 nav {

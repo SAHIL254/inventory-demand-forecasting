@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Batch Predict — Inventory Demand Forecasting{% endblock %}
+
+{% block content %}
+
+<div class="hero">
+  <h1>📦 Inventory Demand Forecasting</h1>
+  <p>Predict future sales for each store–item combination using historical data, seasonality, and consumer trends.</p>
+</div>
+
+<div class="card">
+  <h2>📋 Batch Prediction</h2>
+  <p>
+    Enter multiple store–item–date combinations as JSON. Each record must have
+    <code>store</code> ({{ store_min }}–{{ store_max }}),
+    <code>item</code> ({{ item_min }}–{{ item_max }}), and
+    <code>date</code> (YYYY-MM-DD, after 2017-12-31 for best results).
+  </p>
+
+  <form method="POST" action="/predict/batch" id="batch-form">
+    <div class="form-group">
+      <label for="records">Records (JSON array)</label>
+      <textarea id="records" name="records" rows="8" required
+                style="width:100%; padding:.6rem .9rem; border:1.5px solid #cbd5e0;
+                       border-radius:8px; font-size:.9rem; font-family:monospace;
+                       background:#f7fafc; color:#2d3748; resize:vertical;"
+                placeholder='[
+  {"store": 1, "item": 5,  "date": "2018-01-01"},
+  {"store": 2, "item": 10, "date": "2018-01-01"}
+]'>{{ prefill if prefill else '' }}</textarea>
+    </div>
+
+    <button type="submit" class="btn btn-primary" id="batch-btn">Run Batch Prediction</button>
+    <span id="batch-loading" style="display:none; margin-left:1rem; color:#2b6cb0; font-weight:600;">
+      ⏳ Predicting…
+    </span>
+  </form>
+</div>
+
+{% if results %}
+<div class="card">
+  <h2>Results</h2>
+  <table class="results-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Store</th>
+        <th>Item</th>
+        <th>Predicted Sales (units)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in results %}
+      <tr>
+        <td>{{ row.date }}</td>
+        <td>{{ row.store }}</td>
+        <td>{{ row.item }}</td>
+        <td><strong>{{ row.predicted_sales }}</strong></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<script>
+  document.getElementById("batch-form").addEventListener("submit", function () {
+    document.getElementById("batch-btn").disabled = true;
+    document.getElementById("batch-btn").textContent = "Predicting…";
+    document.getElementById("batch-loading").style.display = "inline";
+  });
+</script>
+
+{% endblock %}

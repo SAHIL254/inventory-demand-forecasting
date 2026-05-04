@@ -132,7 +132,7 @@ class PredictionPipeline:
                 )
                 history = pd.concat([history, new_row], ignore_index=True)
                 logger.info(
-                    f"  {forecast_date.date()} → predicted_sales={predicted_sales:.2f}"
+                    f"  {forecast_date.date()} -> predicted_sales={predicted_sales:.2f}"
                 )
 
             result_df = pd.DataFrame(results)

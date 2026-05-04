@@ -4,11 +4,13 @@ app.py
 FastAPI web application for Inventory Demand Forecasting.
 
 Routes:
-  GET  /              — Home page (model status)
-  GET  /predict       — Single-prediction form
-  POST /predict       — Run single-step prediction
-  POST /predict/batch — JSON API for batch predictions
-  POST /predict/multi — JSON API for multi-step (7/30-day) forecasts
+  GET  /                   — Redirects to /predict
+  GET  /predict            — Single-prediction form
+  POST /predict            — Run single-step prediction
+  GET  /predict/batch      — Batch prediction form
+  POST /predict/batch      — Run batch prediction (HTML form)
+  GET  /predict/multi      — Multi-step forecast form
+  POST /predict/multi      — Run multi-step forecast (HTML form)
 """
 
 import os
@@ -91,9 +93,9 @@ def _render(request: Request, template: str, **ctx):
     ctx.setdefault("flash_msg", None)
     ctx.setdefault("flash_cat", None)
     return templates.TemplateResponse(
-        request=request,        # ← pass as keyword argument
-        name=template,          # ← pass as keyword argument  
-        context=ctx             # ← context does NOT include request anymore
+        request=request,        #  pass as keyword argument
+        name=template,          #  pass as keyword argument  
+        context=ctx             #  context does NOT include request anymore
     )
 
 
@@ -187,91 +189,132 @@ async def predict_submit(
         )
 
 
-@app.post("/predict/batch")
-async def predict_batch(body: BatchRequest):
-    """
-    JSON API — predict sales for multiple store-item-date combinations.
+@app.get("/predict/batch", response_class=HTMLResponse)
+async def batch_form(request: Request):
+    """Render the batch prediction form."""
+    return _render(request, "batch.html",
+                   store_min=STORE_MIN, store_max=STORE_MAX,
+                   item_min=ITEM_MIN,   item_max=ITEM_MAX,
+                   results=None, flash_msg=None, flash_cat=None)
 
-    Request body:
-        {"records": [{"store": 1, "item": 5, "date": "2018-01-01"}, ...]}
 
-    Response:
-        {"success": true, "predictions": [...]}
-    """
+@app.post("/predict/batch", response_class=HTMLResponse)
+async def batch_submit(request: Request):
+    """Handle batch prediction form submission."""
     if not _model_exists():
-        raise HTTPException(status_code=400, detail="Model not found. Train first.")
-
-    if not body.records:
-        raise HTTPException(status_code=400, detail="No records provided.")
-
-    for i, rec in enumerate(body.records):
-        err = _validate_store_item(rec.store, rec.item)
-        if err:
-            raise HTTPException(status_code=400, detail=f"Record {i}: {err}")
-        try:
-            pd.to_datetime(rec.date)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Record {i}: invalid date '{rec.date}'.")
-
+        return _render(request, "batch.html",
+                       store_min=STORE_MIN, store_max=STORE_MAX,
+                       item_min=ITEM_MIN,   item_max=ITEM_MAX,
+                       results=None,
+                       flash_msg="Model not found. Please train first.",
+                       flash_cat="danger")
     try:
-        records_dicts = [r.model_dump() for r in body.records]
-        future_df         = pd.DataFrame(records_dicts)
-        future_df["date"] = pd.to_datetime(future_df["date"])
-        history           = pd.read_csv(RAW_DATA, parse_dates=["date"])
+        form   = await request.form()
+        raw    = form.get("records", "").strip()
+        import json
+        records = json.loads(raw)
+
+        # Validate each record
+        for i, rec in enumerate(records):
+            err = _validate_store_item(int(rec["store"]), int(rec["item"]))
+            if err:
+                raise ValueError(f"Record {i+1}: {err}")
+            pd.to_datetime(rec["date"])
+
+        future_df         = pd.DataFrame(records)
+        future_df["store"] = future_df["store"].astype(int)
+        future_df["item"]  = future_df["item"].astype(int)
+        future_df["date"]  = pd.to_datetime(future_df["date"])
+        history            = pd.read_csv(RAW_DATA, parse_dates=["date"])
 
         pipeline  = PredictionPipeline(model_path=MODEL_PATH)
         result_df = pipeline.predict_from_raw(history, future_df)
         result_df["predicted_sales"] = result_df["predicted_sales"].round(2)
         result_df["date"] = result_df["date"].astype(str)
 
-        return {"success": True, "predictions": result_df.to_dict(orient="records")}
+        return _render(request, "batch.html",
+                       store_min=STORE_MIN, store_max=STORE_MAX,
+                       item_min=ITEM_MIN,   item_max=ITEM_MAX,
+                       results=result_df.to_dict(orient="records"),
+                       flash_msg=f"Batch complete — {len(result_df)} prediction(s) returned.",
+                       flash_cat="success")
 
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return _render(request, "batch.html",
+                       store_min=STORE_MIN, store_max=STORE_MAX,
+                       item_min=ITEM_MIN,   item_max=ITEM_MAX,
+                       results=None,
+                       flash_msg="Invalid JSON. Check the format and try again.",
+                       flash_cat="danger")
     except Exception as e:
         logger.error(f"Batch prediction failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return _render(request, "batch.html",
+                       store_min=STORE_MIN, store_max=STORE_MAX,
+                       item_min=ITEM_MIN,   item_max=ITEM_MAX,
+                       results=None,
+                       flash_msg=f"Prediction failed: {str(e)}",
+                       flash_cat="danger")
 
 
-@app.post("/predict/multi")
-async def predict_multi(body: MultiRequest):
-    """
-    JSON API — recursive multi-step forecast for a single store-item pair.
+@app.get("/predict/multi", response_class=HTMLResponse)
+async def multi_form(request: Request):
+    """Render the multi-step forecast form."""
+    return _render(request, "multi.html",
+                   store_min=STORE_MIN, store_max=STORE_MAX,
+                   item_min=ITEM_MIN,   item_max=ITEM_MAX,
+                   results=None, flash_msg=None, flash_cat=None)
 
-    Request body:
-        {"store": 1, "item": 5, "days": 7}
 
-    Response:
-        {"success": true, "store": 1, "item": 5, "days": 7, "predictions": [...]}
-    """
+@app.post("/predict/multi", response_class=HTMLResponse)
+async def multi_submit(
+    request: Request,
+    store: int = Form(...),
+    item:  int = Form(...),
+    days:  int = Form(...),
+):
+    """Handle multi-step forecast form submission."""
+    base_ctx = dict(
+        store_min=STORE_MIN, store_max=STORE_MAX,
+        item_min=ITEM_MIN,   item_max=ITEM_MAX,
+        results=None, store=store, item=item, days=days,
+        flash_msg=None, flash_cat=None,
+    )
+
     if not _model_exists():
-        raise HTTPException(status_code=400, detail="Model not found. Train first.")
+        return _render(request, "multi.html",
+                       **{**base_ctx, "flash_msg": "Model not found. Please train first.",
+                          "flash_cat": "danger"})
 
-    err = _validate_store_item(body.store, body.item)
+    err = _validate_store_item(store, item)
     if err:
-        raise HTTPException(status_code=400, detail=err)
+        return _render(request, "multi.html",
+                       **{**base_ctx, "flash_msg": err, "flash_cat": "danger"})
 
-    if not (1 <= body.days <= 90):
-        raise HTTPException(status_code=400, detail="days must be between 1 and 90.")
+    if not (1 <= days <= 90):
+        return _render(request, "multi.html",
+                       **{**base_ctx, "flash_msg": "Days must be between 1 and 90.",
+                          "flash_cat": "danger"})
 
     try:
-        history      = _load_history(body.store, body.item)
+        history      = _load_history(store, item)
         last_date    = pd.to_datetime(history["date"]).max()
-        future_dates = [last_date + timedelta(days=i + 1) for i in range(body.days)]
+        future_dates = [last_date + timedelta(days=i + 1) for i in range(days)]
 
         pipeline  = PredictionPipeline(model_path=MODEL_PATH)
-        result_df = pipeline.predict_multi_step(history, body.store, body.item, future_dates)
+        result_df = pipeline.predict_multi_step(history, store, item, future_dates)
         result_df["date"] = result_df["date"].astype(str)
 
-        return {
-            "success":     True,
-            "store":       body.store,
-            "item":        body.item,
-            "days":        body.days,
-            "predictions": result_df[["date", "predicted_sales"]].to_dict(orient="records"),
-        }
+        return _render(request, "multi.html",
+                       **{**base_ctx,
+                          "results": result_df[["date", "predicted_sales"]].to_dict(orient="records"),
+                          "flash_msg": f"{days}-day forecast for Store {store}, Item {item} complete.",
+                          "flash_cat": "success"})
 
     except Exception as e:
         logger.error(f"Multi-step prediction failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return _render(request, "multi.html",
+                       **{**base_ctx, "flash_msg": f"Prediction failed: {str(e)}",
+                          "flash_cat": "danger"})
 
 
 # ── Run ───────────────────────────────────────────────────────

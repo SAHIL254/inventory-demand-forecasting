@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Multi-Step Forecast — Inventory Demand Forecasting{% endblock %}
+
+{% block content %}
+
+<div class="hero">
+  <h1>📦 Inventory Demand Forecasting</h1>
+  <p>Predict future sales for each store–item combination using historical data, seasonality, and consumer trends.</p>
+</div>
+
+<div class="card">
+  <h2>📈 Multi-Step Forecast</h2>
+  <p>
+    Forecast sales for the next <strong>N consecutive days</strong> for a single store–item pair.
+    Each day's prediction feeds into the next as a lag feature.
+    Best results within 14 days — accuracy degrades beyond 30 days.
+  </p>
+
+  <form method="POST" action="/predict/multi" id="multi-form">
+
+    <div class="grid-2">
+      <div class="form-group">
+        <label for="store">Store ID <small>({{ store_min }} – {{ store_max }})</small></label>
+        <input type="number" id="store" name="store"
+               min="{{ store_min }}" max="{{ store_max }}" required
+               value="{{ store if store else '' }}"
+               placeholder="e.g. 1"/>
+      </div>
+
+      <div class="form-group">
+        <label for="item">Item ID <small>({{ item_min }} – {{ item_max }})</small></label>
+        <input type="number" id="item" name="item"
+               min="{{ item_min }}" max="{{ item_max }}" required
+               value="{{ item if item else '' }}"
+               placeholder="e.g. 5"/>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="days">Number of Days to Forecast <small>(1 – 90)</small></label>
+      <input type="number" id="days" name="days"
+             min="1" max="90" required
+             value="{{ days if days else 7 }}"
+             placeholder="e.g. 7"/>
+    </div>
+
+    <button type="submit" class="btn btn-primary" id="multi-btn">Run Forecast</button>
+    <span id="multi-loading" style="display:none; margin-left:1rem; color:#2b6cb0; font-weight:600;">
+      ⏳ Forecasting…
+    </span>
+  </form>
+</div>
+
+{% if results %}
+<div class="card">
+  <h2>Forecast Results — Store {{ store }}, Item {{ item }}</h2>
+  <table class="results-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Date</th>
+        <th>Predicted Sales (units)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in results %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ row.date }}</td>
+        <td><strong>{{ row.predicted_sales }}</strong></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<script>
+  document.getElementById("multi-form").addEventListener("submit", function () {
+    document.getElementById("multi-btn").disabled = true;
+    document.getElementById("multi-btn").textContent = "Forecasting…";
+    document.getElementById("multi-loading").style.display = "inline";
+  });
+</script>
+
+{% endblock %}

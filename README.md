@@ -1,11 +1,6 @@
 # 📦 Inventory Demand Forecasting
 
-An end-to-end machine learning pipeline that predicts daily sales for every **store × item** combination using historical data, seasonality signals, and lag-based features — deployed as a **FastAPI web application** with a clean UI and JSON REST API.
-
----
-
-🌐 Live Demo: https://inventory-demand-forecasting-dhof.onrender.com  
-⚠️ First load may take ~50 seconds (Render free tier)
+An end-to-end machine learning pipeline that predicts daily sales for every **store × item** combination using historical data, seasonality signals, and lag-based features — deployed as a **FastAPI web application** with a clean UI.
 
 ---
 
@@ -53,7 +48,7 @@ Stage 4 — Model Training        LR · RF · XGBoost · LightGBM → auto-selec
 artifacts/model.pkl             saved best model
   │
   ▼
-FastAPI Web App                 UI + REST API for predictions
+FastAPI Web App                 UI for single / batch / multi-step predictions
 ```
 
 ---
@@ -94,6 +89,8 @@ Computed with `shift(1)` — never includes today's sales (no data leakage).
 | **LightGBM** | 1000 estimators, num_leaves=31 — typically wins |
 
 The best model is **automatically selected** by lowest **SMAPE** on the 2017 hold-out test set and saved to `artifacts/model.pkl`.
+
+> **Training runs locally only.** The deployed app serves predictions from the pre-trained model — it does not retrain on the server.
 
 ---
 
@@ -163,9 +160,10 @@ inventory-demand-forecasting/
 │   ├── static/style.css
 │   └── templates/
 │       ├── base.html
-│       ├── index.html
-│       ├── predict.html
-│       └── result.html
+│       ├── predict.html                single-step prediction form
+│       ├── batch.html                  batch prediction form
+│       ├── multi.html                  multi-step forecast form
+│       └── result.html                 training results (local use)
 │
 ├── requirements.txt
 ├── setup.py
@@ -179,11 +177,11 @@ inventory-demand-forecasting/
 ### 1. Clone and create environment
 
 ```bash
-git clone https://github.com/SAHIL254/inventory-demand-forecasting.git
+git clone https://github.com/your-username/inventory-demand-forecasting.git
 cd inventory-demand-forecasting
 
-conda create -n venv python=3.11 -y
-conda activate venv
+conda create -n venv2 python=3.11 -y
+conda activate venv2
 ```
 
 ### 2. Install dependencies
@@ -193,7 +191,7 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-### 3. Train the model
+### 3. Train the model (local only)
 
 ```bash
 python -m src.pipeline.training_pipeline
@@ -205,72 +203,49 @@ Expected runtime: **5–10 minutes** depending on hardware.
 ### 4. Start the web app
 
 ```bash
-uvicorn app.app:app --host 0.0.0.0 --port 10000 --reload
+uvicorn app.app:app --host 0.0.0.0 --port 5000 --reload
 ```
 
-Open **http://localhost:10000** in your browser.
+Open **http://localhost:5000** in your browser.
 
 ---
 
 ## 🌐 Web Application
 
+The app lands directly on the prediction form. Use the navbar to switch between modes.
+
 ### Pages
 
 | Route | Method | Description |
 |-------|--------|-------------|
-| `/` | GET | Home — model status, train button |
-| `/train` | POST | Triggers full training pipeline |
+| `/` | GET | Redirects to `/predict` |
 | `/predict` | GET | Single-prediction form |
 | `/predict` | POST | Returns predicted units for one date |
+| `/predict/batch` | GET | Batch prediction form |
+| `/predict/batch` | POST | Predict for multiple store-item-date rows |
+| `/predict/multi` | GET | Multi-step forecast form |
+| `/predict/multi` | POST | Recursive N-day forecast for one store-item pair |
 
-### JSON API Endpoints
+### Single Prediction (`/predict`)
+Enter a Store ID (1–10), Item ID (1–50), and a future date to get the predicted units sold for that day.
 
-#### POST `/predict/batch`
-Predict sales for multiple store-item-date combinations in one request.
+### Batch Prediction (`/predict/batch`)
+Paste a JSON array of records. Each record needs `store`, `item`, and `date`.
 
-**Request:**
+**Example input:**
 ```json
-{
-  "records": [
-    {"store": 1, "item": 5,  "date": "2018-01-01"},
-    {"store": 3, "item": 12, "date": "2018-01-15"}
-  ]
-}
+[
+  {"store": 1, "item": 5,  "date": "2018-01-01"},
+  {"store": 2, "item": 10, "date": "2018-01-01"}
+]
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "predictions": [
-    {"date": "2018-01-01", "store": 1, "item": 5,  "predicted_sales": 42.5},
-    {"date": "2018-01-15", "store": 3, "item": 12, "predicted_sales": 31.2}
-  ]
-}
-```
+Results are shown in a table on the same page.
 
-#### POST `/predict/multi`
-Recursive multi-step forecast for a single store-item pair (up to 90 days).
+### Multi-Step Forecast (`/predict/multi`)
+Enter a Store ID, Item ID, and number of days (1–90). The model forecasts each day sequentially, feeding each prediction back as a lag input for the next day.
 
-**Request:**
-```json
-{"store": 1, "item": 5, "days": 7}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "store": 1,
-  "item": 5,
-  "days": 7,
-  "predictions": [
-    {"date": "2018-01-01", "predicted_sales": 42.5},
-    {"date": "2018-01-02", "predicted_sales": 39.1}
-  ]
-}
-```
-
+> Accuracy degrades beyond ~14 days as prediction errors compound recursively.
 
 ---
 
@@ -322,3 +297,4 @@ Recursive multi-step forecast for a single store-item pair (up to 90 days).
 - **Predict future dates only** — dates already in the training data (2013–2016) will produce unreliable predictions because lag features will be zero or missing.
 - The model is trained on **Store IDs 1–10** and **Item IDs 1–50** only. Inputs outside this range are rejected.
 - For best predictions, use dates **after 2017-12-31** (the last date in the dataset).
+- **Training is local only** — the deployed app does not have a train button. Run `python -m src.pipeline.training_pipeline` locally and commit `artifacts/model.pkl` to deploy updated models.
