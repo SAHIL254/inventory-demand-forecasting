@@ -4,6 +4,11 @@ An end-to-end machine learning pipeline that predicts daily sales for every **st
 
 ---
 
+🌐 Live Demo: https://inventory-demand-forecasting-dhof.onrender.com  
+⚠️ First load may take ~50 seconds (Render free tier)
+
+---
+
 ## 🧠 Problem Statement
 
 Retailers face significant losses due to inaccurate demand estimation, leading to **stockouts** (lost revenue) or **overstock situations** (wasted capital). Traditional forecasting models struggle to adapt to dynamic market conditions.
