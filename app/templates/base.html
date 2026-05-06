@@ -5,15 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>{% block title %}Inventory Demand Forecasting{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}"/>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
 <nav>
-  <a class="brand" href="/">Inventory Forecast</a>
+  <a class="brand" href="/">📦 Inventory Forecast</a>
   <div class="nav-links">
     <a href="/predict">Single</a>
     <a href="/predict/batch">Batch</a>
-    <a href="/predict/multi">Multi-Step</a>
+    <a href="/predict/multi">Dashboard</a>
   </div>
 </nav>
 
@@ -28,6 +29,14 @@
   {% block content %}{% endblock %}
 
 </div>
+
+<!-- Highlight the active nav link based on current URL path -->
+<script>
+  const path = window.location.pathname;
+  document.querySelectorAll("nav .nav-links a").forEach(a => {
+    if (a.getAttribute("href") === path) a.classList.add("active");
+  });
+</script>
 
 </body>
 </html>

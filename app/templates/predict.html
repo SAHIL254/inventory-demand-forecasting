@@ -51,8 +51,39 @@
 {% if prediction is not none %}
 <div class="prediction-box">
   <div class="label">Predicted Sales for Store {{ store }}, Item {{ item }} on {{ date }}</div>
-  <div class="value">{{ prediction }}</div>
+  <div class="value">{{ prediction | round(0) | int }}</div>
   <div class="unit">units</div>
+</div>
+
+<!-- Quick KPI strip below single prediction -->
+<div class="kpi-strip">
+  <div class="kpi-strip-card">
+    <div class="kpi-strip-label">Predicted</div>
+    <div class="kpi-strip-value">{{ prediction | round(0) | int }}</div>
+    <div class="kpi-strip-unit">units</div>
+  </div>
+  <div class="kpi-strip-card">
+    <div class="kpi-strip-label">Store</div>
+    <div class="kpi-strip-value">{{ store }}</div>
+    <div class="kpi-strip-unit">ID</div>
+  </div>
+  <div class="kpi-strip-card">
+    <div class="kpi-strip-label">Item</div>
+    <div class="kpi-strip-value">{{ item }}</div>
+    <div class="kpi-strip-unit">ID</div>
+  </div>
+  <div class="kpi-strip-card">
+    <div class="kpi-strip-label">Forecast Date</div>
+    <div class="kpi-strip-value" style="font-size:1.1rem;">{{ date }}</div>
+    <div class="kpi-strip-unit">YYYY-MM-DD</div>
+  </div>
+  <div class="kpi-strip-card">
+    <div class="kpi-strip-label">Want more?</div>
+    <div class="kpi-strip-value" style="font-size:1rem;">
+      <a href="/predict/multi" class="btn btn-primary" style="padding:.4rem 1rem;font-size:.85rem;">Multi-Step →</a>
+    </div>
+    <div class="kpi-strip-unit">full dashboard</div>
+  </div>
 </div>
 {% endif %}
 

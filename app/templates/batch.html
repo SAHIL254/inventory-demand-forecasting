@@ -55,7 +55,7 @@
         <td>{{ row.date }}</td>
         <td>{{ row.store }}</td>
         <td>{{ row.item }}</td>
-        <td><strong>{{ row.predicted_sales }}</strong></td>
+        <td><strong>{{ row.predicted_sales | round(0) | int }}</strong></td>
       </tr>
       {% endfor %}
     </tbody>

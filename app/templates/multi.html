@@ -1,86 +1,507 @@
 {% extends "base.html" %}
-{% block title %}Multi-Step Forecast — Inventory Demand Forecasting{% endblock %}
+{% block title %}Analytics Dashboard — Inventory Demand Forecasting{% endblock %}
 
 {% block content %}
 
 <div class="hero">
   <h1>📦 Inventory Demand Forecasting</h1>
-  <p>Predict future sales for each store–item combination using historical data, seasonality, and consumer trends.</p>
+  <p>AI-powered analytics dashboard — live forecasting, inventory recommendations, and demand intelligence.</p>
 </div>
 
+<!-- ── Input Form ──────────────────────────────────────────── -->
+<!--
+  ARCHITECTURE NOTE (interview):
+  This form does NOT submit to the server via POST.
+  It calls two FastAPI JSON endpoints in parallel using fetch():
+    1. /api/dashboard  → chart data + forecast KPIs
+    2. /api/inventory  → stock recommendation + alerts
+  Both responses arrive as JSON and update the DOM directly.
+  This is the "SPA-lite" pattern: Jinja2 renders the shell,
+  JavaScript owns all dynamic updates after page load.
+-->
 <div class="card">
-  <h2>📈 Multi-Step Forecast</h2>
-  <p>
-    Forecast sales for the next <strong>N consecutive days</strong> for a single store–item pair.
-    Each day's prediction feeds into the next as a lag feature.
-    Best results within 14 days — accuracy degrades beyond 30 days.
-  </p>
+  <h2>📈 AI Inventory Analytics Dashboard</h2>
+  <p>Enter store, item, current stock level, and forecast horizon. The dashboard updates live without page reload.</p>
 
-  <form method="POST" action="/predict/multi" id="multi-form">
-
-    <div class="grid-2">
+  <form id="dashboard-form">
+    <div class="grid-3">
       <div class="form-group">
-        <label for="store">Store ID <small>({{ store_min }} – {{ store_max }})</small></label>
+        <label for="store">Store ID <small>({{ store_min }}–{{ store_max }})</small></label>
         <input type="number" id="store" name="store"
                min="{{ store_min }}" max="{{ store_max }}" required
-               value="{{ store if store else '' }}"
-               placeholder="e.g. 1"/>
+               value="{{ store if store else 1 }}" placeholder="e.g. 1"/>
       </div>
-
       <div class="form-group">
-        <label for="item">Item ID <small>({{ item_min }} – {{ item_max }})</small></label>
+        <label for="item">Item ID <small>({{ item_min }}–{{ item_max }})</small></label>
         <input type="number" id="item" name="item"
                min="{{ item_min }}" max="{{ item_max }}" required
-               value="{{ item if item else '' }}"
-               placeholder="e.g. 5"/>
+               value="{{ item if item else 5 }}" placeholder="e.g. 5"/>
+      </div>
+      <div class="form-group">
+        <label for="days">Forecast Days <small>(1–90)</small></label>
+        <input type="number" id="days" name="days"
+               min="1" max="90" required
+               value="{{ days if days else 30 }}" placeholder="e.g. 30"/>
       </div>
     </div>
 
-    <div class="form-group">
-      <label for="days">Number of Days to Forecast <small>(1 – 90)</small></label>
-      <input type="number" id="days" name="days"
-             min="1" max="90" required
-             value="{{ days if days else 7 }}"
-             placeholder="e.g. 7"/>
+    <!-- Current stock input — feeds the recommendation engine -->
+    <div class="form-group" style="max-width:320px;">
+      <label for="current-stock">
+        Current Stock Level <small>(units on hand)</small>
+      </label>
+      <input type="number" id="current-stock" name="current_stock"
+             min="0" step="1" required
+             value="500" placeholder="e.g. 500"/>
     </div>
 
-    <button type="submit" class="btn btn-primary" id="multi-btn">Run Forecast</button>
-    <span id="multi-loading" style="display:none; margin-left:1rem; color:#2b6cb0; font-weight:600;">
-      ⏳ Forecasting…
-    </span>
+    <button type="submit" class="btn btn-primary" id="dash-btn">
+      ▶ Generate Dashboard
+    </button>
+
+    <div id="loading-overlay">
+      <div class="spinner"></div>
+      <span>Running forecast &amp; computing inventory recommendations…</span>
+    </div>
   </form>
 </div>
 
-{% if results %}
-<div class="card">
-  <h2>Forecast Results — Store {{ store }}, Item {{ item }}</h2>
-  <table class="results-table">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Date</th>
-        <th>Predicted Sales (units)</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in results %}
-      <tr>
-        <td>{{ loop.index }}</td>
-        <td>{{ row.date }}</td>
-        <td><strong>{{ row.predicted_sales }}</strong></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %}
+<!-- ── Dashboard (hidden until data loads) ────────────────── -->
+<div id="dashboard" style="display:none;">
 
+  <!-- ── Inventory Recommendation Panel ──────────────────── -->
+  <!--
+    ARCHITECTURE NOTE (interview):
+    This entire section is populated by /api/inventory response.
+    The recommendation badge, inventory KPIs, and alert list are
+    all driven by the safety stock formula computed on the backend.
+    Frontend only renders — all business logic stays in Python.
+  -->
+  <p class="section-title">🤖 AI Inventory Recommendation</p>
+
+  <!-- Recommendation badge: REORDER / MONITOR / OVERSTOCK -->
+  <div id="rec-badge-container" style="margin-bottom:.5rem;"></div>
+
+  <!-- Inventory KPI row: 5 cards specific to stock analysis -->
+  <div class="kpi-grid" id="inv-kpi-grid">
+    <div class="kpi-card" id="inv-card-demand">
+      <div class="kpi-icon">📦</div>
+      <div class="kpi-label">Total Predicted Demand</div>
+      <div class="kpi-value" id="inv-kpi-demand">—</div>
+      <div class="kpi-unit">units over forecast period</div>
+    </div>
+    <div class="kpi-card" id="inv-card-stock">
+      <div class="kpi-icon">🏭</div>
+      <div class="kpi-label">Current Stock</div>
+      <div class="kpi-value" id="inv-kpi-stock">—</div>
+      <div class="kpi-unit">units on hand</div>
+    </div>
+    <div class="kpi-card" id="inv-card-recommended">
+      <div class="kpi-icon">🎯</div>
+      <div class="kpi-label">Recommended Stock</div>
+      <div class="kpi-value" id="inv-kpi-recommended">—</div>
+      <div class="kpi-unit">units (demand + safety buffer)</div>
+    </div>
+    <div class="kpi-card" id="inv-card-risk">
+      <div class="kpi-icon" id="inv-risk-icon">⚡</div>
+      <div class="kpi-label">Risk Level</div>
+      <div class="kpi-value" id="inv-kpi-risk">—</div>
+      <div class="kpi-unit">stock coverage assessment</div>
+    </div>
+    <div class="kpi-card" id="inv-card-growth">
+      <div class="kpi-icon" id="inv-growth-icon">📈</div>
+      <div class="kpi-label">Demand Growth</div>
+      <div class="kpi-value" id="inv-kpi-growth">—</div>
+      <div class="kpi-unit">vs last 90 days avg</div>
+    </div>
+  </div>
+
+  <!-- Alert banners — rendered dynamically from /api/inventory alerts[] -->
+  <div id="alert-list" class="alert-list"></div>
+
+  <!-- Safety stock detail row -->
+  <div class="card" id="safety-card" style="padding:1rem 1.5rem; margin-bottom:1.5rem;">
+    <div style="display:flex; gap:2.5rem; flex-wrap:wrap; align-items:center;">
+      <div>
+        <div style="font-size:.72rem;color:#718096;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Safety Stock</div>
+        <div style="font-size:1.3rem;font-weight:800;color:#1a365d;" id="detail-safety">—</div>
+        <div style="font-size:.72rem;color:#a0aec0;">units (Z=1.65, 95% SL)</div>
+      </div>
+      <div>
+        <div style="font-size:.72rem;color:#718096;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Reorder Point</div>
+        <div style="font-size:1.3rem;font-weight:800;color:#1a365d;" id="detail-reorder">—</div>
+        <div style="font-size:.72rem;color:#a0aec0;">units (7-day lead time)</div>
+      </div>
+      <div>
+        <div style="font-size:.72rem;color:#718096;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Stock Cover</div>
+        <div style="font-size:1.3rem;font-weight:800;color:#1a365d;" id="detail-cover">—</div>
+        <div style="font-size:.72rem;color:#a0aec0;">days at forecast rate</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Forecast KPI Cards ───────────────────────────────── -->
+  <p class="section-title">📊 Forecast KPIs</p>
+  <div class="kpi-grid" id="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon">🎯</div>
+      <div class="kpi-label">Next-Day Forecast</div>
+      <div class="kpi-value" id="kpi-predicted">—</div>
+      <div class="kpi-unit">units</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">📊</div>
+      <div class="kpi-label">Avg Historical Sales</div>
+      <div class="kpi-value" id="kpi-avg">—</div>
+      <div class="kpi-unit">units / day</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon" id="kpi-growth-icon">📈</div>
+      <div class="kpi-label">Forecast vs History</div>
+      <div class="kpi-value" id="kpi-growth">—</div>
+      <div class="kpi-unit">growth %</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">🔥</div>
+      <div class="kpi-label">Peak Demand</div>
+      <div class="kpi-value" id="kpi-peak">—</div>
+      <div class="kpi-unit">units (max day)</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">✅</div>
+      <div class="kpi-label">Forecast Confidence</div>
+      <div class="kpi-value" id="kpi-confidence">—</div>
+      <div class="kpi-unit">% stability score</div>
+    </div>
+  </div>
+
+  <!-- ── Forecast Line Chart ──────────────────────────────── -->
+  <p class="section-title">📉 Sales Forecast</p>
+  <div class="card chart-card fade-up">
+    <h2>Sales Forecast with Confidence Band</h2>
+    <p class="chart-note">
+      Blue = historical sales (last 90 days) &nbsp;|&nbsp;
+      Orange dashed = predicted sales &nbsp;|&nbsp;
+      Shaded area = ±15% confidence band
+    </p>
+    <div id="chart-forecast"></div>
+  </div>
+
+  <!-- ── Store Comparison + Weekly Seasonality ────────────── -->
+  <p class="section-title">🏪 Store Comparison &amp; Weekly Patterns</p>
+  <div class="grid-2-charts">
+    <div class="card chart-card fade-up">
+      <h2>Store-wise Sales Comparison</h2>
+      <p class="chart-note">Avg daily sales for Item <span id="item-label-store">—</span> across all stores. Active store highlighted in orange.</p>
+      <div id="chart-store"></div>
+    </div>
+    <div class="card chart-card fade-up">
+      <h2>Weekly Seasonality</h2>
+      <p class="chart-note">Average sales by day of week from full history. Reveals which days drive the most demand.</p>
+      <div id="chart-weekly"></div>
+    </div>
+  </div>
+
+  <!-- ── Monthly Seasonality ──────────────────────────────── -->
+  <p class="section-title">🗓️ Monthly Seasonality</p>
+  <div class="card chart-card fade-up">
+    <h2>Monthly Seasonality Pattern</h2>
+    <p class="chart-note">Average sales by month from full history. Nov–Jan typically peaks due to festive season demand.</p>
+    <div id="chart-monthly"></div>
+  </div>
+
+  <!-- ── Demand Heatmap ───────────────────────────────────── -->
+  <p class="section-title">🌡️ Demand Intensity Heatmap</p>
+  <div class="card chart-card fade-up">
+    <h2>Store × Item Demand Heatmap</h2>
+    <p class="chart-note">Average daily sales intensity across all stores and items. Darker = higher demand.</p>
+    <div id="chart-heatmap"></div>
+  </div>
+
+</div><!-- end #dashboard -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     JAVASCRIPT
+     ═══════════════════════════════════════════════════════════
+  ARCHITECTURE (interview):
+  - One form submit fires TWO parallel fetch() calls using Promise.all()
+  - /api/dashboard  → Plotly charts + forecast KPIs
+  - /api/inventory  → recommendation engine + alert system
+  - Both are independent: dashboard renders even if inventory fails
+  - All Plotly calls use newPlot() on first load; subsequent calls
+    could use react() for smoother updates (not needed here since
+    the user explicitly clicks "Generate")
+  - No page reload ever happens — this is pure client-side rendering
+-->
 <script>
-  document.getElementById("multi-form").addEventListener("submit", function () {
-    document.getElementById("multi-btn").disabled = true;
-    document.getElementById("multi-btn").textContent = "Forecasting…";
-    document.getElementById("multi-loading").style.display = "inline";
+// ── Colour tokens ──────────────────────────────────────────
+const C = {
+  blue:     "#2b6cb0",
+  orange:   "#dd6b20",
+  band:     "rgba(221,107,32,0.15)",
+  green:    "#276749",
+  red:      "#c53030",
+  amber:    "#b7791f",
+  lightBg:  "#f7fafc",
+};
+
+// ── Shared Plotly layout ───────────────────────────────────
+const BASE_LAYOUT = {
+  paper_bgcolor: "white",
+  plot_bgcolor:  C.lightBg,
+  font:    { family: "'Segoe UI', sans-serif", color: "#2d3748", size: 12 },
+  margin:  { t: 20, r: 20, b: 60, l: 60 },
+  xaxis:   { gridcolor: "#e2e8f0", linecolor: "#cbd5e0", zeroline: false },
+  yaxis:   { gridcolor: "#e2e8f0", linecolor: "#cbd5e0", title: "Units Sold", zeroline: false },
+  legend:  { orientation: "h", y: -0.22, font: { size: 11 } },
+  hovermode: "x unified",
+};
+const CFG = { responsive: true, displayModeBar: false };
+
+// ── Form submit: fire both API calls in parallel ───────────
+document.getElementById("dashboard-form").addEventListener("submit", async function(e) {
+  e.preventDefault();
+
+  const store = document.getElementById("store").value;
+  const item  = document.getElementById("item").value;
+  const days  = document.getElementById("days").value;
+  const stock = document.getElementById("current-stock").value;
+
+  document.getElementById("loading-overlay").style.display = "flex";
+  document.getElementById("dash-btn").disabled = true;
+  document.getElementById("dashboard").style.display = "none";
+
+  try {
+    // Promise.all fires both requests simultaneously — faster than sequential
+    const [dashRes, invRes] = await Promise.all([
+      fetch(`/api/dashboard?store=${store}&item=${item}&days=${days}`),
+      fetch(`/api/inventory?store=${store}&item=${item}&current_stock=${stock}&days=${days}`),
+    ]);
+
+    if (!dashRes.ok) throw new Error((await dashRes.json()).detail || "Dashboard API error");
+    if (!invRes.ok)  throw new Error((await invRes.json()).detail  || "Inventory API error");
+
+    const dash = await dashRes.json();
+    const inv  = await invRes.json();
+
+    // Render inventory section first (top of dashboard)
+    renderInventory(inv);
+
+    // Render forecast KPIs + charts
+    fillForecastKPIs(dash.kpis);
+    drawForecastChart(dash.historical, dash.forecast);
+    drawStoreChart(dash.store_comparison, item);
+    drawWeeklyChart(dash.seasonality_weekly);
+    drawMonthlyChart(dash.seasonality_monthly);
+    drawHeatmap(dash.heatmap);
+
+    document.getElementById("item-label-store").textContent = item;
+    document.getElementById("dashboard").style.display = "block";
+    document.getElementById("dashboard").scrollIntoView({ behavior: "smooth" });
+
+  } catch(err) {
+    alert("Dashboard error: " + err.message);
+  } finally {
+    document.getElementById("loading-overlay").style.display = "none";
+    document.getElementById("dash-btn").disabled = false;
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// INVENTORY RECOMMENDATION RENDERER
+// Receives the /api/inventory JSON and updates:
+//   1. Recommendation badge
+//   2. Inventory KPI cards (with risk-coloured top borders)
+//   3. Alert banners
+//   4. Safety stock detail row
+// ══════════════════════════════════════════════════════════════
+function renderInventory(inv) {
+  const kpis = inv.inventory_kpis;
+  const risk = inv.risk_level;  // "HIGH" | "MEDIUM" | "LOW"
+
+  // ── 1. Recommendation badge ──────────────────────────────
+  const icons = { REORDER: "🚨", MONITOR: "👁️", OVERSTOCK: "📦" };
+  document.getElementById("rec-badge-container").innerHTML =
+    `<span class="rec-badge rec-${inv.recommendation}">
+       ${icons[inv.recommendation] || "⚡"} ${inv.recommendation}
+     </span>`;
+
+  // ── 2. Inventory KPI cards ───────────────────────────────
+  // Risk class drives the top-border colour via CSS
+  const riskClass = `risk-${risk.toLowerCase()}`;
+  const riskColour = risk === "HIGH" ? C.red : risk === "MEDIUM" ? C.amber : C.green;
+
+  setInvKPI("inv-card-demand",      "inv-kpi-demand",      Math.round(kpis.predicted_demand));
+  setInvKPI("inv-card-stock",       "inv-kpi-stock",       Math.round(kpis.current_stock));
+  setInvKPI("inv-card-recommended", "inv-kpi-recommended", Math.round(kpis.recommended_stock));
+
+  // Risk card gets colour treatment
+  const riskCard = document.getElementById("inv-card-risk");
+  riskCard.className = `kpi-card ${riskClass}`;
+  document.getElementById("inv-kpi-risk").textContent  = risk;
+  document.getElementById("inv-kpi-risk").className    = `kpi-value ${riskClass}`;
+  document.getElementById("inv-risk-icon").textContent =
+    risk === "HIGH" ? "🔴" : risk === "MEDIUM" ? "🟡" : "🟢";
+
+  // Growth card
+  const growthEl   = document.getElementById("inv-kpi-growth");
+  const growthIcon = document.getElementById("inv-growth-icon");
+  growthEl.textContent   = kpis.growth_pct + "%";
+  growthEl.style.color   = kpis.growth_pct >= 0 ? C.green : C.red;
+  growthIcon.textContent = kpis.growth_pct >= 0 ? "📈" : "📉";
+
+  // Staggered entrance animation on inventory KPI cards
+  document.querySelectorAll("#inv-kpi-grid .kpi-card").forEach((card, i) => {
+    card.style.opacity = "0"; card.style.transform = "translateY(20px)";
+    setTimeout(() => {
+      card.style.transition = "opacity .4s ease, transform .4s ease";
+      card.style.opacity = "1"; card.style.transform = "translateY(0)";
+    }, i * 80);
   });
+
+  // ── 3. Alert banners ─────────────────────────────────────
+  // Each alert from the backend becomes a styled banner.
+  // type: "danger" | "warning" | "info"
+  const alertList = document.getElementById("alert-list");
+  alertList.innerHTML = "";
+  if (inv.alerts.length === 0) {
+    alertList.innerHTML =
+      `<div class="alert-item alert-info">
+         <span class="alert-icon">✅</span>
+         <span>Inventory levels are healthy. No immediate action required.</span>
+       </div>`;
+  } else {
+    inv.alerts.forEach(a => {
+      alertList.innerHTML +=
+        `<div class="alert-item alert-${a.type}">
+           <span class="alert-icon">${a.icon}</span>
+           <span>${a.message}</span>
+         </div>`;
+    });
+  }
+
+  // ── 4. Safety stock detail row ───────────────────────────
+  document.getElementById("detail-safety").textContent  = Math.round(inv.safety_stock);
+  document.getElementById("detail-reorder").textContent = Math.round(inv.reorder_point);
+  document.getElementById("detail-cover").textContent   = Math.round(inv.stock_cover_days);
+}
+
+// Helper: set a single inventory KPI value
+function setInvKPI(cardId, valueId, value) {
+  document.getElementById(valueId).textContent = value;
+}
+
+// ══════════════════════════════════════════════════════════════
+// FORECAST KPI CARDS
+// Animated counter from 0 → target over 600ms using
+// requestAnimationFrame — gives a "live data" feel.
+// ══════════════════════════════════════════════════════════════
+function animateValue(el, target) {
+  const start = performance.now();
+  (function step(now) {
+    const t = Math.min((now - start) / 600, 1);
+    el.textContent = Math.round(t * target);
+    if (t < 1) requestAnimationFrame(step);
+    else el.textContent = Math.round(target);
+  })(performance.now());
+}
+
+function fillForecastKPIs(kpis) {
+  animateValue(document.getElementById("kpi-predicted"),  kpis.predicted_sales);
+  animateValue(document.getElementById("kpi-avg"),        kpis.avg_sales);
+  animateValue(document.getElementById("kpi-peak"),       kpis.peak_demand);
+  animateValue(document.getElementById("kpi-confidence"), kpis.confidence);
+
+  const growthEl = document.getElementById("kpi-growth");
+  growthEl.textContent = kpis.growth_pct + "%";
+  growthEl.style.color = kpis.growth_pct >= 0 ? C.green : C.red;
+  document.getElementById("kpi-growth-icon").textContent = kpis.growth_pct >= 0 ? "📈" : "📉";
+
+  document.querySelectorAll("#kpi-grid .kpi-card").forEach((card, i) => {
+    card.style.opacity = "0"; card.style.transform = "translateY(20px)";
+    setTimeout(() => {
+      card.style.transition = "opacity .4s ease, transform .4s ease";
+      card.style.opacity = "1"; card.style.transform = "translateY(0)";
+    }, i * 80);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// PLOTLY CHARTS
+// Each function is self-contained: takes data, calls Plotly.newPlot.
+// newPlot() replaces any existing chart in that div — safe to call
+// multiple times (e.g. when user changes inputs and re-submits).
+// ══════════════════════════════════════════════════════════════
+
+// Forecast line chart with ±15% confidence band
+// The band is drawn as two invisible lines; the lower one uses
+// fill:"tonexty" to shade the area between them.
+function drawForecastChart(historical, forecast) {
+  Plotly.newPlot("chart-forecast", [
+    { x: forecast.dates, y: forecast.upper, type: "scatter", mode: "lines",
+      line: { width: 0 }, showlegend: false, hoverinfo: "skip" },
+    { x: forecast.dates, y: forecast.lower, type: "scatter", mode: "lines",
+      fill: "tonexty", fillcolor: C.band, line: { width: 0 },
+      name: "±15% Confidence Band", hoverinfo: "skip" },
+    { x: historical.dates, y: historical.sales, type: "scatter", mode: "lines",
+      name: "Historical Sales", line: { color: C.blue, width: 2 },
+      hovertemplate: "%{x}<br>Sales: <b>%{y}</b><extra></extra>" },
+    { x: forecast.dates, y: forecast.sales, type: "scatter", mode: "lines+markers",
+      name: "Predicted Sales", line: { color: C.orange, width: 2.5, dash: "dot" },
+      marker: { size: 5, color: C.orange },
+      hovertemplate: "%{x}<br>Forecast: <b>%{y}</b><extra></extra>" },
+  ], { ...BASE_LAYOUT, xaxis: { ...BASE_LAYOUT.xaxis, title: "Date" } }, CFG);
+}
+
+// Store comparison: active store bar highlighted orange
+function drawStoreChart(data, item) {
+  const colours = data.stores.map((_, i) => (i + 1) === data.active_store ? C.orange : C.blue);
+  Plotly.newPlot("chart-store", [{
+    x: data.stores, y: data.sales, type: "bar", marker: { color: colours },
+    hovertemplate: "%{x}<br>Avg Sales: <b>%{y}</b> units<extra></extra>",
+  }], { ...BASE_LAYOUT, xaxis: { ...BASE_LAYOUT.xaxis, title: "Store" }, showlegend: false }, CFG);
+}
+
+// Weekly seasonality bar chart
+function drawWeeklyChart(data) {
+  Plotly.newPlot("chart-weekly", [{
+    x: data.days, y: data.sales, type: "bar",
+    marker: { color: C.blue, opacity: 0.85 },
+    hovertemplate: "%{x}<br>Avg Sales: <b>%{y}</b> units<extra></extra>",
+  }], { ...BASE_LAYOUT, xaxis: { ...BASE_LAYOUT.xaxis, title: "Day of Week" }, showlegend: false }, CFG);
+}
+
+// Monthly seasonality: bars + trend line overlay
+// Combining both makes magnitude AND shape readable simultaneously.
+function drawMonthlyChart(data) {
+  Plotly.newPlot("chart-monthly", [
+    { x: data.months, y: data.sales, type: "bar", name: "Avg Monthly Sales",
+      marker: { color: C.blue, opacity: 0.7 },
+      hovertemplate: "%{x}<br>Avg Sales: <b>%{y}</b> units<extra></extra>" },
+    { x: data.months, y: data.sales, type: "scatter", mode: "lines+markers",
+      name: "Trend", line: { color: C.orange, width: 2.5 },
+      marker: { size: 7, color: C.orange }, hoverinfo: "skip" },
+  ], { ...BASE_LAYOUT, xaxis: { ...BASE_LAYOUT.xaxis, title: "Month" },
+       legend: { orientation: "h", y: -0.28 } }, CFG);
+}
+
+// Store × Item heatmap
+// z[i][j] = avg daily sales for store i, item j.
+// YlOrRd colorscale: yellow (low) → orange → red (high demand).
+function drawHeatmap(data) {
+  Plotly.newPlot("chart-heatmap", [{
+    z: data.z, x: data.items, y: data.stores, type: "heatmap",
+    colorscale: "YlOrRd",
+    hovertemplate: "Store: <b>%{y}</b><br>Item: <b>%{x}</b><br>Avg Sales: <b>%{z}</b><extra></extra>",
+    colorbar: { title: "Avg Sales", thickness: 14, len: 0.9 },
+  }], {
+    paper_bgcolor: "white", plot_bgcolor: "white",
+    font: { family: "'Segoe UI', sans-serif", color: "#2d3748", size: 11 },
+    margin: { t: 20, r: 80, b: 60, l: 80 },
+    xaxis: { title: "Item ID", tickmode: "linear", dtick: 5 },
+    yaxis: { title: "Store ID", autorange: "reversed" },
+  }, CFG);
+}
 </script>
 
 {% endblock %}

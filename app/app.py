@@ -14,9 +14,11 @@ Routes:
 """
 
 import os
+import json
 from datetime import timedelta
 from typing import List, Optional
 
+import numpy as np
 import pandas as pd
 import uvicorn
 from fastapi import FastAPI, Request, Form, HTTPException
@@ -173,7 +175,7 @@ async def predict_submit(
 
         pipeline        = PredictionPipeline(model_path=MODEL_PATH)
         result_df       = pipeline.predict_from_raw(history, future)
-        predicted_sales = round(float(result_df["predicted_sales"].iloc[0]), 2)
+        predicted_sales = int(round(float(result_df["predicted_sales"].iloc[0])))
 
         return _render(
             request, "predict.html",
@@ -229,7 +231,7 @@ async def batch_submit(request: Request):
 
         pipeline  = PredictionPipeline(model_path=MODEL_PATH)
         result_df = pipeline.predict_from_raw(history, future_df)
-        result_df["predicted_sales"] = result_df["predicted_sales"].round(2)
+        result_df["predicted_sales"] = result_df["predicted_sales"].round(0).astype(int)
         result_df["date"] = result_df["date"].astype(str)
 
         return _render(request, "batch.html",
@@ -317,7 +319,260 @@ async def multi_submit(
                           "flash_cat": "danger"})
 
 
-# ── Run ───────────────────────────────────────────────────────
+# ── Inventory Recommendation Engine ─────────────────────────────────────────
+# Interview note:
+# Safety stock = Z * σ_lead * sqrt(lead_time)
+# Z=1.65 → 95% service level, σ_lead = std of daily sales, lead_time = 7 days
+# Reorder point = avg_daily_demand * lead_time + safety_stock
+# If current_stock < reorder_point  → REORDER
+# If current_stock > 2 * avg_forecast → OVERSTOCK
+# Otherwise                          → MONITOR
+
+@app.get("/api/inventory")
+async def inventory_recommendation(
+    store: int,
+    item: int,
+    current_stock: float,
+    days: int = 30,
+):
+    """
+    Compares predicted demand against current stock and returns:
+      - recommendation: REORDER | MONITOR | OVERSTOCK
+      - safety_stock, reorder_point, recommended_stock
+      - risk_level: HIGH | MEDIUM | LOW
+      - alerts: list of alert messages
+      - inventory_kpis: card data for the frontend
+    """
+    if not _model_exists():
+        raise HTTPException(status_code=400, detail="Model not found.")
+    err = _validate_store_item(store, item)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+    if current_stock < 0:
+        raise HTTPException(status_code=400, detail="current_stock must be >= 0.")
+    if not (1 <= days <= 90):
+        raise HTTPException(status_code=400, detail="days must be 1–90.")
+
+    try:
+        history = _load_history(store, item).sort_values("date")
+        last_date    = pd.to_datetime(history["date"]).max()
+        future_dates = [last_date + timedelta(days=i + 1) for i in range(days)]
+
+        pipeline    = PredictionPipeline(model_path=MODEL_PATH)
+        forecast_df = pipeline.predict_multi_step(history, store, item, future_dates)
+        preds       = forecast_df["predicted_sales"].values
+
+        # ── Core inventory calculations ───────────────────────────────────
+        LEAD_TIME   = 7          # days to receive a new order
+        Z_SCORE     = 1.65       # 95% service level
+        daily_std   = float(np.std(preds))
+        avg_forecast = float(np.mean(preds))
+        total_forecast = float(np.sum(preds))
+
+        safety_stock   = round(Z_SCORE * daily_std * (LEAD_TIME ** 0.5), 1)
+        reorder_point  = round(avg_forecast * LEAD_TIME + safety_stock, 1)
+        # Recommended stock = cover the full forecast period + safety buffer
+        recommended_stock = round(total_forecast + safety_stock, 1)
+
+        # ── Decision logic ────────────────────────────────────────────────
+        stock_cover_days = (current_stock / avg_forecast) if avg_forecast > 0 else 999
+
+        if current_stock <= reorder_point:
+            recommendation = "REORDER"
+            risk_level     = "HIGH"
+        elif current_stock > recommended_stock * 1.3:
+            recommendation = "OVERSTOCK"
+            risk_level     = "LOW"
+        else:
+            recommendation = "MONITOR"
+            risk_level     = "MEDIUM"
+
+        # ── Alerts ────────────────────────────────────────────────────────
+        alerts = []
+        if current_stock <= reorder_point:
+            alerts.append({
+                "type": "danger",
+                "icon": "🚨",
+                "message": f"Stock critically low! Current {current_stock:.0f} units is at or below reorder point ({reorder_point} units). Place order immediately.",
+            })
+        if current_stock > recommended_stock * 1.3:
+            alerts.append({
+                "type": "warning",
+                "icon": "⚠️",
+                "message": f"Overstock detected. Current {current_stock:.0f} units exceeds recommended {recommended_stock} units by {current_stock - recommended_stock:.0f} units.",
+            })
+        if stock_cover_days < LEAD_TIME:
+            alerts.append({
+                "type": "danger",
+                "icon": "⏰",
+                "message": f"Only {stock_cover_days:.1f} days of stock remaining — less than lead time ({LEAD_TIME} days). Urgent reorder needed.",
+            })
+        peak = float(np.max(preds))
+        if peak > avg_forecast * 1.5:
+            alerts.append({
+                "type": "info",
+                "icon": "📈",
+                "message": f"Demand spike detected: peak forecast of {peak:.0f} units is {((peak/avg_forecast)-1)*100:.0f}% above average. Consider buffer stock.",
+            })
+
+        hist_avg   = float(history["sales"].tail(90).mean())
+        growth_pct = round(((avg_forecast - hist_avg) / hist_avg) * 100, 1) if hist_avg else 0
+
+        return JSONResponse({
+            "recommendation":  recommendation,
+            "risk_level":      risk_level,
+            "safety_stock":    safety_stock,
+            "reorder_point":   reorder_point,
+            "recommended_stock": recommended_stock,
+            "stock_cover_days":  round(stock_cover_days, 1),
+            "alerts": alerts,
+            "inventory_kpis": {
+                "predicted_demand":   round(total_forecast, 1),
+                "current_stock":      round(current_stock, 1),
+                "recommended_stock":  recommended_stock,
+                "risk_level":         risk_level,
+                "growth_pct":         growth_pct,
+            },
+        })
+
+    except Exception as e:
+        logger.error(f"Inventory recommendation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Dashboard JSON API ────────────────────────────────────
+
+@app.get("/api/dashboard")
+async def dashboard_data(store: int, item: int, days: int = 30):
+    """
+    Returns chart-ready JSON for the dashboard.
+    Called by JavaScript (fetch) after the multi-step form submits.
+
+    Returns:
+      - historical: last 90 days of real sales
+      - forecast:   N-day predicted sales
+      - kpis:       summary statistics
+      - seasonality_weekly: avg sales by day-of-week
+      - seasonality_monthly: avg sales by month
+      - store_comparison: avg daily sales per store for this item
+    """
+    if not _model_exists():
+        raise HTTPException(status_code=400, detail="Model not found.")
+
+    err = _validate_store_item(store, item)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+
+    if not (1 <= days <= 90):
+        raise HTTPException(status_code=400, detail="days must be 1–90.")
+
+    try:
+        # ── Historical data (last 90 days for this store-item) ────────────
+        history = _load_history(store, item).sort_values("date")
+        hist_tail = history.tail(90).copy()
+        hist_tail["date"] = hist_tail["date"].astype(str)
+
+        # ── Forecast ────────────────────────────────────────────────
+        last_date    = pd.to_datetime(history["date"]).max()
+        future_dates = [last_date + timedelta(days=i + 1) for i in range(days)]
+        pipeline     = PredictionPipeline(model_path=MODEL_PATH)
+        forecast_df  = pipeline.predict_multi_step(history, store, item, future_dates)
+        forecast_df["date"] = forecast_df["date"].astype(str)
+
+        preds = forecast_df["predicted_sales"].values
+
+        # Simple confidence band: ±15% of predicted value
+        upper = (preds * 1.15).round(2).tolist()
+        lower = (preds * 0.85).round(2).tolist()
+
+        # ── KPIs ─────────────────────────────────────────────────────
+        hist_avg   = float(hist_tail["sales"].mean())
+        pred_avg   = float(np.mean(preds))
+        growth_pct = round(((pred_avg - hist_avg) / hist_avg) * 100, 1) if hist_avg else 0
+        peak       = float(np.max(preds))
+        # Confidence: how stable the forecast is (lower CV = higher confidence)
+        cv         = float(np.std(preds) / np.mean(preds)) if np.mean(preds) else 1
+        confidence = max(0, min(100, round((1 - cv) * 100, 1)))
+
+        # ── Weekly seasonality (avg sales by day-of-week from history) ───
+        history["dow"] = pd.to_datetime(history["date"]).dt.day_name()
+        dow_order = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+        weekly = (
+            history.groupby("dow")["sales"].mean()
+            .reindex(dow_order).round(2)
+        )
+
+        # ── Monthly seasonality (avg sales by month from history) ──────
+        history["month"] = pd.to_datetime(history["date"]).dt.month_name()
+        month_order = ["January","February","March","April","May","June",
+                       "July","August","September","October","November","December"]
+        monthly = (
+            history.groupby("month")["sales"].mean()
+            .reindex(month_order).round(2)
+        )
+
+        # ── Store comparison (avg daily sales for this item across all stores) ─
+        all_data = pd.read_csv(RAW_DATA, parse_dates=["date"])
+        all_item = all_data[all_data["item"] == item]
+        store_avg = (
+            all_item.groupby("store")["sales"].mean().round(2)
+        )
+
+        # ── Heatmap: avg sales per store × item (all stores, items 1–50) ──
+        pivot = (
+            all_data.groupby(["store", "item"])["sales"]
+            .mean().round(2)
+            .unstack(level="item")          # columns = item IDs
+            .sort_index()                   # rows = store IDs ascending
+        )
+        heatmap_z      = pivot.values.tolist()                          # 2-D list
+        heatmap_stores = [f"Store {s}" for s in pivot.index.tolist()]
+        heatmap_items  = [f"Item {i}"  for i in pivot.columns.tolist()]
+
+        return JSONResponse({
+            "historical": {
+                "dates":  hist_tail["date"].tolist(),
+                "sales":  hist_tail["sales"].round(2).tolist(),
+            },
+            "forecast": {
+                "dates":  forecast_df["date"].tolist(),
+                "sales":  preds.round(2).tolist(),
+                "upper":  upper,
+                "lower":  lower,
+            },
+            "kpis": {
+                "predicted_sales": round(float(preds[0]), 2),
+                "avg_sales":       round(hist_avg, 2),
+                "growth_pct":      growth_pct,
+                "peak_demand":     round(peak, 2),
+                "confidence":      confidence,
+            },
+            "seasonality_weekly": {
+                "days":  weekly.index.tolist(),
+                "sales": weekly.values.tolist(),
+            },
+            "seasonality_monthly": {
+                "months": monthly.index.tolist(),
+                "sales":  monthly.values.tolist(),
+            },
+            "store_comparison": {
+                "stores": [f"Store {s}" for s in store_avg.index.tolist()],
+                "sales":  store_avg.values.tolist(),
+                "active_store": store,
+            },
+            "heatmap": {
+                "z":      heatmap_z,
+                "stores": heatmap_stores,
+                "items":  heatmap_items,
+            },
+        })
+
+    except Exception as e:
+        logger.error(f"Dashboard API failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Run ─────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     uvicorn.run(
