@@ -225,8 +225,8 @@ Open **http://localhost:5000** in your browser.
 The application is containerized using Docker to provide a reproducible environment containing the FastAPI application, ML dependencies, trained model, and required system libraries.
 
 Docker Requirements
--Docker Desktop
--Docker Engine with Linux containers enabled
+- Docker Desktop
+- Docker Engine with Linux containers enabled
 
 ## Check Docker installation:
 ```
@@ -247,7 +247,7 @@ docker run --rm -p 5000:5000 inventory-demand-forecasting
 http://localhost:5000
 ```
 ## Docker Architecture
-
+```
 Dockerfile
     │
     ▼
@@ -270,7 +270,7 @@ FastAPI Application
     │
     ▼
 Inventory Demand Predictions
-
+```
 ## Docker Image
 
 The Docker image contains the pre-trained model and does not retrain the model when the container starts.
@@ -373,9 +373,9 @@ The workflow performs the following steps:
 
 The current pipeline validates:
 
--Python dependency installation
--Python source-code compilation
--Docker image creation
+- Python dependency installation
+- Python source-code compilation
+- Docker image creation
 
 The Docker image is currently built for validation but is not automatically pushed to Docker Hub.
 
