@@ -170,11 +170,16 @@ inventory-demand-forecasting/
 │       ├── multi.html                  multi-step forecast form
 │       └── result.html                 training results (local use)
 │
+├── .github/
+│   └── workflows/
+│       └── ci-cd.yaml                  GitHub Actions CI pipeline
+│
+├── .dockerignore                        Docker build exclusions
+├── Dockerfile                           Docker container configuration
 ├── requirements.txt
 ├── setup.py
 └── README.md
 ```
-
 ---
 
 ## 🚀 Setup & Run
@@ -212,6 +217,69 @@ uvicorn app.app:app --host 0.0.0.0 --port 5000 --reload
 ```
 
 Open **http://localhost:5000** in your browser.
+
+---
+
+## 🐳 Docker
+
+The application is containerized using Docker to provide a reproducible environment containing the FastAPI application, ML dependencies, trained model, and required system libraries.
+
+Docker Requirements
+-Docker Desktop
+-Docker Engine with Linux containers enabled
+
+## Check Docker installation:
+```
+docker --version
+```
+## Build the Docker Image
+
+From the project root:
+```
+docker build -t inventory-demand-forecasting .
+```
+## Run the Docker Container
+```
+docker run --rm -p 5000:5000 inventory-demand-forecasting
+```
+## Open:
+```
+http://localhost:5000
+```
+## Docker Architecture
+
+Dockerfile
+    │
+    ▼
+Python 3.11 Slim
+    │
+    ├── libgomp1
+    ├── Python dependencies
+    ├── FastAPI application
+    ├── Source code
+    └── Trained model
+    │
+    ▼
+Docker Image
+    │
+    ▼
+Docker Container
+    │
+    ▼
+FastAPI Application
+    │
+    ▼
+Inventory Demand Predictions
+
+## Docker Image
+
+The Docker image contains the pre-trained model and does not retrain the model when the container starts.
+
+Model training remains a local operation:
+```
+python -m src.pipeline.training_pipeline
+```
+After training a new model, the updated model artifact must be included when building/deploying the application.
 
 ---
 
@@ -254,6 +322,65 @@ Enter a Store ID, Item ID, and number of days (1–90). The model forecasts each
 
 ---
 
+## 🔄 CI/CD Pipeline
+
+GitHub Actions is used to automatically validate the project and build the Docker image whenever changes are pushed to the main branch or a pull request targets main.
+
+## CI/CD Workflow
+
+```
+Git Push / Pull Request
+          │
+          ▼
+   GitHub Actions
+          │
+          ▼
+  Checkout Repository
+          │
+          ▼
+    Setup Python 3.11
+          │
+          ▼
+ Install Dependencies
+          │
+          ▼
+ Validate Python Files
+          │
+          ▼
+    Build Docker Image
+          │
+          ▼
+        ✅ Pass
+```
+## GitHub Actions Configuration
+
+Workflow file:
+```
+.github/workflows/ci-cd.yaml
+```
+
+The workflow performs the following steps:
+
+1. Checks out the repository.
+2. Sets up Python 3.11.
+3. Installs project dependencies.
+4. Installs the project using setup.py.
+5. Validates Python files using compileall.
+6. Builds the Docker image.
+7. Fails the workflow if any step fails.
+
+## CI Status
+
+The current pipeline validates:
+
+-Python dependency installation
+-Python source-code compilation
+-Docker image creation
+
+The Docker image is currently built for validation but is not automatically pushed to Docker Hub.
+
+---
+
 ## 🛠️ Tech Stack
 
 | Category | Tools |
@@ -265,6 +392,10 @@ Enter a Store ID, Item ID, and number of days (1–90). The model forecasts each
 | Web | FastAPI, Uvicorn, Jinja2 |
 | Config | PyYAML |
 | Packaging | setuptools |
+| Containerization | Docker |
+| CI | GitHub Actions |
+| Deployment | Render |
+
 
 ---
 
@@ -285,6 +416,18 @@ Enter a Store ID, Item ID, and number of days (1–90). The model forecasts each
 
 > Change `port` in `config/config.yaml` to match the Render port if needed.
 
+## Docker Deployment
+
+The application can also be run as a Docker container:
+
+```
+docker build -t inventory-demand-forecasting .
+```
+```
+docker run --rm -p 5000:5000 inventory-demand-forecasting
+```
+The Dockerized application has been tested locally with the FastAPI prediction, dashboard, and inventory functionality.
+
 ---
 
 ## 📈 Key Insights from EDA
@@ -303,3 +446,5 @@ Enter a Store ID, Item ID, and number of days (1–90). The model forecasts each
 - The model is trained on **Store IDs 1–10** and **Item IDs 1–50** only. Inputs outside this range are rejected.
 - For best predictions, use dates **after 2017-12-31** (the last date in the dataset).
 - **Training is local only** — the deployed app does not have a train button. Run `python -m src.pipeline.training_pipeline` locally and commit `artifacts/model.pkl` to deploy updated models.
+- **CI/CD currently validates the code and Docker build.** It does not automatically push the Docker image to Docker Hub or trigger a deployment.
+- Docker is used to provide a reproducible runtime environment for the FastAPI application and its ML dependencies.
